@@ -87,13 +87,287 @@ animation: pulse-glow 3s ease-in-out infinite;
 </head>
 <body class="min-h-screen overflow-x-hidden selection:bg-white/10 text-white font-sans bg-[#09090b] relative" style="font-family: 'Inter', sans-serif;">
 
-<!-- Background (component) -->
-<div class="aura-background-component top-0 w-full h-screen -z-10 brightness-75 mix-blend-screen absolute" data-alpha-mask="80" style="; mask-image: linear-gradient(to bottom, transparent, black 0%, black 80%, transparent); -webkit-mask-image: linear-gradient(to bottom, transparent, black 0%, black 80%, transparent)"><div class="aura-background-component top-0 w-full -z-10 absolute h-full">
-  <div data-us-project="uFY4IYPs2LU8fWm96Im2" class="absolute w-full h-full left-0 top-0 -z-10"></div>
-  <script type="text/javascript">
-    !function(){if(!window.UnicornStudio){window.UnicornStudio={isInitialized:!1};var i=document.createElement("script");i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v1.4.29/dist/unicornStudio.umd.js",i.onload=function(){window.UnicornStudio.isInitialized||(UnicornStudio.init(),window.UnicornStudio.isInitialized=!0)},(document.head || document.body).appendChild(i)}}();
-  </script>
-</div></div>
+<!-- Scroll-Driven Video Background -->
+<div id="scroll-video-bg" class="fixed top-0 left-0 w-full h-screen -z-10" style="transition: opacity 500ms; mask-image: linear-gradient(to bottom, black 0%, black 80%, transparent); -webkit-mask-image: linear-gradient(to bottom, black 0%, black 80%, transparent);">
+  <canvas id="scroll-canvas" class="w-full h-full"></canvas>
+  <!-- Dark overlay for text readability -->
+  <div class="absolute inset-0 bg-black/55"></div>
+</div>
+
+<script>
+(function() {
+  const TOTAL_FRAMES = 71;
+  const SCROLL_DISTANCE = window.innerHeight * 2; // 200vh
+  const canvas = document.getElementById('scroll-canvas');
+  const ctx = canvas.getContext('2d');
+  const frames = [];
+  let loadedCount = 0;
+  let currentFrame = -1;
+  let rafId = null;
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    drawFrame(currentFrame >= 0 ? currentFrame : 0);
+  }
+
+  function drawFrame(index) {
+    if (index < 0 || index >= frames.length || !frames[index].complete) return;
+    const img = frames[index];
+    const cw = canvas.width, ch = canvas.height;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    // object-fit: cover
+    const scale = Math.max(cw / iw, ch / ih);
+    const dw = iw * scale, dh = ih * scale;
+    const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.drawImage(img, dx, dy, dw, dh);
+    currentFrame = index;
+  }
+
+  function onScroll() {
+    if (rafId) return;
+    rafId = requestAnimationFrame(function() {
+      rafId = null;
+      const progress = Math.min(Math.max(window.scrollY / SCROLL_DISTANCE, 0), 1);
+      const frameIndex = Math.min(Math.floor(progress * TOTAL_FRAMES), TOTAL_FRAMES - 1);
+      if (frameIndex !== currentFrame) {
+        drawFrame(frameIndex);
+      }
+    });
+  }
+
+  // Preload all frames
+  for (let i = 1; i <= TOTAL_FRAMES; i++) {
+    const img = new Image();
+    img.src = 'frames/frame-' + String(i).padStart(3, '0') + '.jpg';
+    img.onload = function() {
+      loadedCount++;
+      if (loadedCount === 1) {
+        resizeCanvas(); // Draw first frame as soon as it loads
+      }
+      if (loadedCount === TOTAL_FRAMES) {
+        // All loaded, ensure current scroll position is rendered
+        onScroll();
+      }
+    };
+    frames.push(img);
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+})();
+</script>
+
+<!-- Circuit Board Animated Background -->
+<div id="circuit-bg" class="fixed top-0 left-0 w-full h-screen -z-10" style="pointer-events: none; opacity: 0; transition: opacity 500ms;">
+  <canvas id="circuit-canvas" class="w-full h-full"></canvas>
+  <div class="absolute inset-0 bg-black/45"></div>
+</div>
+
+<script>
+(function() {
+  const circuitBg = document.getElementById('circuit-bg');
+  const videoBg = document.getElementById('scroll-video-bg');
+  const canvas = document.getElementById('circuit-canvas');
+  const ctx = canvas.getContext('2d');
+  let animating = false;
+  let animId = null;
+  let circuitVisible = false;
+
+  const GRID_SPACING = 70;
+  const PARTICLE_COUNT = 25;
+  const particles = [];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  // Initialize particles at random grid positions
+  function initParticles() {
+    particles.length = 0;
+    const cols = Math.floor(canvas.width / GRID_SPACING);
+    const rows = Math.floor(canvas.height / GRID_SPACING);
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const col = Math.floor(Math.random() * cols);
+      const row = Math.floor(Math.random() * rows);
+      // direction: 0=right, 1=down, 2=left, 3=up
+      particles.push({
+        x: col * GRID_SPACING,
+        y: row * GRID_SPACING,
+        dir: Math.floor(Math.random() * 4),
+        speed: 0.8 + Math.random() * 1.2,
+        brightness: 0.4 + Math.random() * 0.6,
+        trail: []
+      });
+    }
+  }
+
+  function drawGrid() {
+    const w = canvas.width, h = canvas.height;
+    // Vertical lines
+    ctx.strokeStyle = 'rgba(59,130,246,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += GRID_SPACING) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+    }
+    // Horizontal lines
+    for (let y = 0; y <= h; y += GRID_SPACING) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+    }
+    ctx.stroke();
+
+    // Nodes at intersections
+    for (let x = 0; x <= w; x += GRID_SPACING) {
+      for (let y = 0; y <= h; y += GRID_SPACING) {
+        const bright = Math.random() < 0.15;
+        const r = bright ? 2.5 : 1.5;
+        const alpha = bright ? 0.2 : 0.08;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(96,165,250,' + alpha + ')';
+        ctx.fill();
+      }
+    }
+  }
+
+  function updateParticle(p) {
+    const dx = [1, 0, -1, 0];
+    const dy = [0, 1, 0, -1];
+    p.x += dx[p.dir] * p.speed;
+    p.y += dy[p.dir] * p.speed;
+
+    // Store trail
+    p.trail.push({ x: p.x, y: p.y });
+    if (p.trail.length > 20) p.trail.shift();
+
+    // Check if at a grid intersection (within tolerance)
+    const atNodeX = Math.abs(p.x % GRID_SPACING) < p.speed + 0.5 || Math.abs(p.x % GRID_SPACING - GRID_SPACING) < p.speed + 0.5;
+    const atNodeY = Math.abs(p.y % GRID_SPACING) < p.speed + 0.5 || Math.abs(p.y % GRID_SPACING - GRID_SPACING) < p.speed + 0.5;
+
+    if (atNodeX && atNodeY) {
+      // Snap to grid
+      p.x = Math.round(p.x / GRID_SPACING) * GRID_SPACING;
+      p.y = Math.round(p.y / GRID_SPACING) * GRID_SPACING;
+      // Random turn at intersection (70% chance)
+      if (Math.random() < 0.7) {
+        const choices = [0, 1, 2, 3].filter(d => d !== ((p.dir + 2) % 4)); // don't reverse
+        p.dir = choices[Math.floor(Math.random() * choices.length)];
+      }
+    }
+
+    // Wrap around edges
+    if (p.x < -GRID_SPACING) p.x = canvas.width;
+    if (p.x > canvas.width + GRID_SPACING) p.x = 0;
+    if (p.y < -GRID_SPACING) p.y = canvas.height;
+    if (p.y > canvas.height + GRID_SPACING) p.y = 0;
+  }
+
+  function drawParticle(p) {
+    // Trail
+    for (let i = 0; i < p.trail.length; i++) {
+      const t = p.trail[i];
+      const alpha = (i / p.trail.length) * 0.15 * p.brightness;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(96,165,250,' + alpha + ')';
+      ctx.fill();
+    }
+    // Head
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(96,165,250,' + (0.6 * p.brightness) + ')';
+    ctx.fill();
+    // Glow
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(59,130,246,' + (0.1 * p.brightness) + ')';
+    ctx.fill();
+  }
+
+  function animate() {
+    if (!animating) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+    for (const p of particles) {
+      updateParticle(p);
+      drawParticle(p);
+    }
+    animId = requestAnimationFrame(animate);
+  }
+
+  function startAnimation() {
+    if (animating) return;
+    animating = true;
+    if (particles.length === 0) initParticles();
+    animate();
+  }
+
+  function stopAnimation() {
+    animating = false;
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+  }
+
+  function showCircuit() {
+    if (circuitVisible) return;
+    circuitVisible = true;
+    circuitBg.style.opacity = '1';
+    videoBg.style.opacity = '0';
+    startAnimation();
+  }
+
+  function hideCircuit() {
+    if (!circuitVisible) return;
+    circuitVisible = false;
+    circuitBg.style.opacity = '0';
+    videoBg.style.opacity = '1';
+    stopAnimation();
+  }
+
+  function fadeOutCircuit() {
+    circuitVisible = false;
+    circuitBg.style.opacity = '0';
+    stopAnimation();
+  }
+
+  // Scroll-based transition logic (deferred until DOM is ready)
+  let featuresEl = null;
+  let pricingEl = null;
+
+  function checkTransitions() {
+    if (!featuresEl) return;
+    const featuresTop = featuresEl.getBoundingClientRect().top;
+    const pricingTop = pricingEl ? pricingEl.getBoundingClientRect().top : Infinity;
+    const triggerPoint = window.innerHeight * 0.85;
+
+    if (featuresTop < triggerPoint && pricingTop > triggerPoint) {
+      showCircuit();
+    } else if (featuresTop >= triggerPoint) {
+      hideCircuit();
+    } else if (pricingTop <= triggerPoint) {
+      fadeOutCircuit();
+    }
+  }
+
+  window.addEventListener('resize', function() {
+    resize();
+    initParticles();
+  });
+  resize();
+
+  document.addEventListener('DOMContentLoaded', function() {
+    featuresEl = document.getElementById('features');
+    pricingEl = document.getElementById('pricing');
+    window.addEventListener('scroll', checkTransitions, { passive: true });
+    checkTransitions();
+  });
+})();
+</script>
 
 <!-- Background Glow Effects -->
 <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden flex items-center justify-center">
